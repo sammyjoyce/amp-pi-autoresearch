@@ -2,3 +2,9 @@
 *.log
 node_modules/
 dist/
+autoresearch.jsonl
+autoresearch.md
+autoresearch.sh
+autoresearch.checks.sh
+autoresearch.ideas.md
+.amp/pi-autoresearch.pending.json
