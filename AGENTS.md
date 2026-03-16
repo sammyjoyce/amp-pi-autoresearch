@@ -42,6 +42,7 @@ These learnings were extracted from real work sessions. They exist so future age
   ```
 - **Runner diagnostics live in `_diag/`.** Check `/var/lib/github-runner/<name>/_diag/Worker_*.log` for exact script literals and environment mappings sent by GitHub Actions.
 - **Blanket state directory cleanup is fragile.** The upstream NixOS `services.github-runners` module runs `find "$STATE_DIRECTORY/" -mindepth 1 -delete` which fails if a legacy `work` directory is mounted or busy. Exclude known problematic paths or handle errors gracefully.
+- **Systemd hardening affects shell behavior in runners.** Options like `ProtectHome` and minimal `PATH` change how login shells resolve commands compared to a standard user session. Test workflow commands under the same constraints as the service unit.
 
 ### Closed Review Loop
 
@@ -52,6 +53,7 @@ These learnings were extracted from real work sessions. They exist so future age
 - **Short-circuit review when there is no diff.** If `base_sha == head_sha` or the computed diff is empty, exit early instead of posting redundant "no actionable findings" reviews.
 - **Use `gh pr merge --match-head-commit <sha>` in automation.** This prevents merging the wrong head if new commits land between review and merge.
 - **Verify remote PR state before babysitting.** Run `gh pr view` first; the PR may already be merged/closed remotely, making babysitting actions unnecessary.
+- **Treat empty reviewer output as a structured failure.** When the reviewer produces no response, log it as a loop failure with links to session logs rather than posting a benign "no findings" comment.
 
 ### Git Workflow
 
