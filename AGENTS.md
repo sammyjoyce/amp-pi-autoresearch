@@ -59,6 +59,25 @@ These learnings were extracted from real work sessions. They exist so future age
 
 - **Use `git worktree add` for isolated PRs.** When the local repo has unrelated changes, create a clean worktree for the specific fix. This avoids including unrelated edits in `nix flake check` or PR diffs.
 
+### Upstream Research Methodology
+
+- **Separate "consumer guarantee" from "incidental detail" in every spec.** When researching upstream code for porting, classify each behavior as either a stable product contract (what consumers rely on) or an implementation detail (what happens to be true today). Over-specifying internals creates brittle specs that break during cross-language ports.
+- **Use the "one-sentence-without-'and'" test for topic boundaries.** If you cannot describe a spec topic in one sentence without the conjunction "and," the topic is too broad and should be split. This prevents unstable "junk drawer" specs.
+- **Group specs by stage boundaries, not package boundaries.** For cross-language ports, organize by semantic phases (e.g., builder → planner → runtime) rather than source-package structure. Package boundaries are an artifact of the original language's module system and may not apply in the target.
+- **Exclude timing constants from product specs.** Retry intervals, timeout values, debounce durations, and ping/pong cadences are tuning parameters, not contractual guarantees. Document them as "implementation notes" rather than required behavior.
+- **Verify Oracle findings against source code.** When using the Oracle for architectural analysis, always ground its conclusions by reading the actual upstream files. The Oracle can overclaim behaviors that tests don't actually prove.
+
+### Zero Upstream Architecture (Key Discoveries)
+
+- **SQLite NULL + OR = full table scan.** When building `OR` queries with bound parameters in SQLite, if any branch involves a `NULL` value, SQLite abandons its `MULTI-INDEX OR` optimization and falls back to a full table scan (320x slowdown observed). Filter out NULL conditions before building OR queries.
+- **The "record-then-delegate" pattern is a semantic seam.** In `Connection.send()`, the timestamp update is unconditional while the actual transport is conditional on socket state. This is not mere utility extraction — the boundary dictates which effects are unconditional vs. gated. Respect these boundaries when porting.
+- **Poke delivery is coalesced, not 1:1.** Multiple completed pokes received before a scheduled callback are merged into a single local apply. Do not assume a 1:1 mapping between server pokes and client listener calls.
+- **`got` is a protocol marker, not a hydration signal.** The `got` callback tracks whether the server has marked a query in the `gotQueries` set, not whether data has been loaded. Materialized views deliver data independently via their own listener mechanism.
+- **`needs-auth` and `error` are "paused" states, not terminal.** They halt the auto-retry run loop but are resumable via `connect()`. Only `closed` is truly terminal.
+- **Auth revision uses a watermark pattern.** The committed auth revision (`#lastAuthRevision`) is separate from the live session revision. The watermark only advances after successful query re-evaluation, preventing stale auth from being considered "applied."
+- **Mutation retry is error-persistence, not recovery.** On transaction failure, the server retries once but skips the mutator — it only bumps the LMID and writes the error. This ensures mutation ordering is preserved even on failure.
+- **`disconnected` still auto-retries.** Unlike `needs-auth`/`error`, the `disconnected` state keeps the run loop active with backoff. Do not treat it as a paused state.
+
 ### Autoresearch Loop
 
 - **Read `autoresearch.md` before every iteration.** It is the durable handoff document. Skipping it leads to repeated dead-end experiments.
