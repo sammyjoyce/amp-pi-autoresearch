@@ -78,6 +78,20 @@ These learnings were extracted from real work sessions. They exist so future age
 - **Mutation retry is error-persistence, not recovery.** On transaction failure, the server retries once but skips the mutator — it only bumps the LMID and writes the error. This ensures mutation ordering is preserved even on failure.
 - **`disconnected` still auto-retries.** Unlike `needs-auth`/`error`, the `disconnected` state keeps the run loop active with backoff. Do not treat it as a paused state.
 
+### Plugin Debugging and Startup
+
+- **Use tmux isolated sessions for plugin startup diagnostics.** Run `pi` (or `amp`) in a tmux pane and capture output with `capture-pane -p -J` to get the full startup log including changelog, skill/extension lists, and warnings. Add `--verbose` for deeper traces.
+- **Duplicate extensions cause command/tool conflicts.** If a local copy of an extension exists in `~/.pi/agent/extensions/` and the same extension is bundled in the Nix package, commands will conflict. Delete the local copy and rely on the packaged version. Use `pi list` / `pi config` to inspect what is loaded.
+- **Pi scans skill directories recursively; use `.ignore` files for noise.** Non-SKILL.md files (e.g., `SKILL-AUDIT.md`, `SKILL-CATALOG.md`, `README.md`, `CHANGELOG.md`) in skill directories trigger "description is required" validation warnings. Add an `.ignore` file listing them, or use per-package `skills: ["-exclude.md"]` filters.
+- **Do not symlink stateful config files via Home Manager.** Files like `settings.json` that the runtime writes to (e.g., `lastChangelogVersion`) get overwritten on HM rebuild if managed as symlinks. Instead, install via `home.packages` and use an `activation` script that reads the existing file, merges managed defaults, and preserves runtime-written keys.
+- **Set `extended-keys-format csi-u` in tmux.** The default `xterm` format triggers warnings in Pi/Amp. Explicit `csi-u` provides better key handling.
+
+### Headless and CLI Mode
+
+- **Wrap `ctx.ui.confirm` for headless auto-approval.** In non-TUI mode (`amp -x`), confirm dialogs auto-decline with `false`. Detect this by measuring confirm latency: if `confirm()` returns `false` in ≤75ms, the environment is headless. Use a `confirmOrAutoApprove` wrapper that returns `{ approved: true, nonInteractive: true }` in this case.
+- **Apply the headless wrapper to all user gates.** Plan approvals, risky-command confirmations, and session-replacement prompts all need the wrapper. Grep for `ctx.ui.confirm` across the plugin to find every call site.
+- **Structured tool schemas enforce agent behavior.** Tools like `grind_report` with JSON schemas for status (`plan|checkpoint|complete|blocked`) and required fields keep the agent on-rails. This pattern works well for autoresearch iteration control.
+
 ### Autoresearch Loop
 
 - **Read `autoresearch.md` before every iteration.** It is the durable handoff document. Skipping it leads to repeated dead-end experiments.
